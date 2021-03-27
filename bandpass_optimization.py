@@ -143,7 +143,7 @@ def bandpass_filtering(bp_lo, bp_hi, white_data, tevent):
     
     out = minimize(osc_dif, params=p, args=(x, white_data_bp_zoom, unc))
     
-    print(out.params['Mc'])
+    print('bandpass: 30 - {:.0f}; Mc: {:.3f}'.format(bp_hi, out.params['Mc'].value))
     
     return out
 
@@ -180,7 +180,7 @@ white_data = strain.whiten()
 
 result_dict = {'bp': [], 'Mc':[], 't0':[], 'C':[], 'phi':[]}
 
-for bp in np.linspace(80, 400, 30):
+for bp in np.linspace(80, 400, 10):
     
     result_dict['bp'].append(bp)
     

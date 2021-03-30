@@ -143,9 +143,23 @@ def bandpass_filtering(bp_lo, bp_hi, white_data, tevent):
     
     out = minimize(osc_dif, params=p, args=(x, white_data_bp_zoom, unc))
     
-    print('bandpass: 30 - {:.0f}; Mc: {:.3f}'.format(bp_hi, out.params['Mc'].value))
+    fit_function = np.array(model.eval(params=out.params,t=x))
     
-    return out
+    chi_square = 0
+
+    for i in range(len(white_data_bp_zoom)):
+        chi_square += (white_data_bp_zoom[i] - fit_function[i])**2 / (abs(white_data_bp_zoom[i]))
+    
+    for i in range(len(white_data_bp_zoom)):
+        chi_square += (white_data_bp_zoom[i] - fit_function[i])**2 / (abs(white_data_bp_zoom[i]))
+
+    redchi = chi_square / (len(white_data_bp_zoom) - 4)
+    
+    r_sq = 1 - out.chisqr / np.var(white_data_bp_zoom)
+    
+    print('bandpass: {:.0f} - {:.0f}; Mc: {:.3f}; r_sq = {:.6f}'.format(bp_lo, bp_hi, out.params['Mc'].value, r_sq))
+    
+    return out, redchi
 
 
 
@@ -175,23 +189,58 @@ asd = strain.asd(fftlength=8)
 white_data = strain.whiten()
 
 
-# Fit iterations
+# Iterate upper bandpass limit
 #----------------------------------------------------------------
 
-result_dict = {'bp': [], 'Mc':[], 't0':[], 'C':[], 'phi':[]}
+result_dict = {'bp': [], 'Mc':[], 't0':[], 'C':[], 'phi':[], 'redchi':[]}
 
-for bp in np.linspace(80, 400, 10):
+for bp in np.linspace(80,600, 20):
     
     result_dict['bp'].append(bp)
     
-    out = bandpass_filtering(30, bp, white_data, tevent)
+    out, redchi = bandpass_filtering(30, bp, white_data, tevent)
     
     for param in out.params:
         
         # append fitted parameters to lists in result_dict
-        result_dict[param].append(out.params[param].value)  
+        result_dict[param].append(out.params[param].value)
+    
+    result_dict['redchi'].append(redchi)
+
+
+# Iterate lower bandpass limit
+#----------------------------------------------------------------
+
+# result_dict = {'bp': [], 'Mc':[], 't0':[], 'C':[], 'phi':[], 'redchi':[]}
+
+# for bp in np.linspace(10, 100, 45):
+    
+#     result_dict['bp'].append(bp)
+    
+#     out, redchi = bandpass_filtering(bp, 350, white_data, tevent)
+    
+#     for param in out.params:
         
+#         # append fitted parameters to lists in result_dict
+#         result_dict[param].append(out.params[param].value)  
+    
+#     result_dict['redchi'].append(redchi)
         
+
+lower_bp = result_dict['bp']
+redchi = result_dict['redchi']
+Mc = result_dict['Mc']
+
+plt.scatter(lower_bp, redchi, color='k')
+plt.xlabel('Lower bandpass filter limit (__ - 350) $[Hz]$')
+plt.ylabel('Reduced $\chi^2$')
+
+for i, bp in enumerate(lower_bp):
+    plt.text(bp, redchi[i], round(Mc[i],1), fontsize=8)
+
+plt.tight_layout()
+plt.savefig("Lower bandpass chisq sensitivity-2", dpi=300)
+plt.show()
 
 
 

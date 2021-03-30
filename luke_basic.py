@@ -135,7 +135,7 @@ white_data = strain.whiten()
 
 # Bandpass filtering
 #----------------------------------------------------------------
-bandpass_low = 30
+bandpass_low = 100
 bandpass_high = 350
 
 white_data_bp = white_data.bandpass(bandpass_low, bandpass_high)
@@ -194,8 +194,23 @@ print(fit_report(out))
 plt.plot(x, model.eval(params=out.params,t=x),'r',label='best fit')
 plt.show()
 
-for i in out.params:
-    print(i)
+print(out.chisqr)
+
+print(max(model.eval(params=out.params,t=x)))
+diff = abs(np.array(white_data_bp_zoom) - np.array(model.eval(params=out.params,t=x)))
+
+fit_function = np.array(model.eval(params=out.params,t=x))
+
+chi_square = 0
+
+for i in range(len(white_data_bp_zoom)):
+    chi_square += (white_data_bp_zoom[i] - fit_function[i])**2 / (abs(white_data_bp_zoom[i]))
+
+print(chi_square)
+
+print(chi_square / (len(white_data_bp_zoom) - 4))
+
+
 
 
 

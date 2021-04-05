@@ -66,9 +66,9 @@ def osc(t, Mc, t0, C, phi):
     vals = []
     for time in t:
         if time <= t0:
-            vals.append(C*1e-12 * (Mc * gwfreq(Mc, time, t0))**(10/3) * np.cos(gwfreq(Mc, time, t0) * (time-t0) + phi))
+            vals.append(C * (Mc * gwfreq(Mc, time, t0))**(10/3) * np.cos(gwfreq(Mc, time, t0) * (time-t0) + phi))
         else:
-            vals.append(np.exp(-100*(time-t0)) * C*1e-12 * (Mc * gwfreq(Mc, time, t0))**(10/3) * np.cos(gwfreq(Mc, time, t0) * (time-t0) + phi))
+            vals.append(np.exp(-100*(time-t0)) * C * (Mc * gwfreq(Mc, time, t0))**(10/3) * np.cos(gwfreq(Mc, time, t0) * (time-t0) + phi))
 
     return np.asarray(vals)
 
@@ -131,6 +131,8 @@ asd = strain.asd(fftlength=8)
 #----------------------------------------------------------------
 white_data = strain.whiten()
 
+# print(white_data)
+
 
 
 # Bandpass filtering
@@ -140,14 +142,14 @@ bandpass_high = 350
 
 white_data_bp = white_data.bandpass(bandpass_low, bandpass_high)
 
-plt.figure()
-white_data_bp.plot()
-plt.ylabel('strain (whitened + band-pass)')
+# plt.figure()
+# white_data_bp.plot()
+# plt.ylabel('strain (whitened + band-pass)')
 
-plt.figure()
-white_data_bp.plot()
-plt.ylabel('strain zoomed (whitened + band-pass)')
-plt.xlim(tevent-.17, tevent+.13)
+# plt.figure()
+# white_data_bp.plot()
+# plt.ylabel('strain zoomed (whitened + band-pass)')
+# plt.xlim(tevent-.17, tevent+.13)
 
 
 
@@ -157,11 +159,11 @@ times = np.linspace(-0.1, 0.3, 1000)
 freq = osc(times, 30, 0.18, 1, 0.0)
 omega = gwfreq(30, times, .18)
 
-plt.figure(figsize=(12, 4))
-plt.subplots_adjust(left=0.1, right=0.9, top=0.85, bottom=0.2)
-plt.plot(times, freq)
-plt.xlabel('Time (s) since '+str(tevent))
-plt.ylabel('strain')
+# plt.figure(figsize=(12, 4))
+# plt.subplots_adjust(left=0.1, right=0.9, top=0.85, bottom=0.2)
+# plt.plot(times, freq)
+# plt.xlabel('Time (s) since '+str(tevent))
+# plt.ylabel('strain')
 
 
 
@@ -185,30 +187,50 @@ model = lmfit.Model(osc)
 p = model.make_params()
 p['Mc'].set(20)     # Mass guess
 p['t0'].set(0.18)  # By construction we put the merger in the center
-p['C'].set(1)      # normalization guess
+p['C'].set(1e-12)      # normalization guess
 p['phi'].set(0)    # Phase guess
 unc = np.full(len(white_data_bp_zoom),20)
 print(unc)
 out = minimize(osc_dif, params=p, args=(x, white_data_bp_zoom, unc))
 print(fit_report(out))
+Mc = out.params['Mc']
+t0 = out.params['t0']
+C = out.params['C']
+phi = out.params['phi']
+
+plt.plot(x, osc(x, Mc, t0, C, phi))
+
 plt.plot(x, model.eval(params=out.params,t=x),'r',label='best fit')
-plt.show()
 
-print(out.chisqr)
 
-print(max(model.eval(params=out.params,t=x)))
-diff = abs(np.array(white_data_bp_zoom) - np.array(model.eval(params=out.params,t=x)))
+# print(out.chisqr)
+# print(max(model.eval(params=out.params,t=x)))
+# diff = abs(np.array(white_data_bp_zoom) - np.array(model.eval(params=out.params,t=x)))
 
 fit_function = np.array(model.eval(params=out.params,t=x))
 
 chi_square = 0
+residual = 0
 
 for i in range(len(white_data_bp_zoom)):
-    chi_square += (white_data_bp_zoom[i] - fit_function[i])**2 / (abs(white_data_bp_zoom[i]))
+    chi_square += (white_data_bp_zoom[i] - fit_function[i])**2 / (.10 * white_data_bp_zoom[i])**2
+    residual += (white_data_bp_zoom[i] - fit_function[i])**2
 
-print(chi_square)
+print('chisq:', chi_square / (len(white_data_bp_zoom) - 4))
 
-print(chi_square / (len(white_data_bp_zoom) - 4))
+plt.figure()
+plt.plot(x, (white_data_bp_zoom - fit_function) / (.3))
+
+remaining_signal = (white_data_bp_zoom - fit_function) / (.3)
+print('remaining = ', np.std(remaining_signal))
+print(np.where(remaining_signal == max(remaining_signal)))
+print(remaining_signal[223])
+print(white_data_bp_zoom[223])
+print(fit_function[223])
+
+plt.savefig("good strain fit", dpi=300)
+plt.show()
+
 
 
 

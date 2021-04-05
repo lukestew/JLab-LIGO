@@ -144,22 +144,16 @@ def bandpass_filtering(bp_lo, bp_hi, white_data, tevent):
     out = minimize(osc_dif, params=p, args=(x, white_data_bp_zoom, unc))
     
     fit_function = np.array(model.eval(params=out.params,t=x))
-    
-    chi_square = 0
+    # chi_square = 0
 
-    for i in range(len(white_data_bp_zoom)):
-        chi_square += (white_data_bp_zoom[i] - fit_function[i])**2 / (abs(white_data_bp_zoom[i]))
+    # for i in range(len(white_data_bp_zoom)):
+    #     chi_square += (white_data_bp_zoom[i] - fit_function[i])**2 / (.10 * white_data_bp_zoom[i])**2
     
-    for i in range(len(white_data_bp_zoom)):
-        chi_square += (white_data_bp_zoom[i] - fit_function[i])**2 / (abs(white_data_bp_zoom[i]))
-
-    redchi = chi_square / (len(white_data_bp_zoom) - 4)
+    print('bandpass: {:.0f} - {:.0f}'.format(bp_lo, bp_hi))
     
-    r_sq = 1 - out.chisqr / np.var(white_data_bp_zoom)
+    fit_function = np.array(model.eval(params=out.params,t=x))
     
-    print('bandpass: {:.0f} - {:.0f}; Mc: {:.3f}; r_sq = {:.6f}'.format(bp_lo, bp_hi, out.params['Mc'].value, r_sq))
-    
-    return out, redchi
+    return out, x, white_data_bp_zoom, fit_function
 
 
 
@@ -189,60 +183,121 @@ asd = strain.asd(fftlength=8)
 white_data = strain.whiten()
 
 
-# Iterate upper bandpass limit
+
+# Iterate lower bandpass limit
 #----------------------------------------------------------------
 
-result_dict = {'bp': [], 'Mc':[], 't0':[], 'C':[], 'phi':[], 'redchi':[]}
+result_dict = {'bp': [], 'Mc':[], 't0':[], 't0_err':[], 'C':[], 'phi':[], 'redchi':[]}
 
-for bp in np.linspace(80,600, 20):
+for bp in np.linspace(10,70,20):
     
     result_dict['bp'].append(bp)
     
-    out, redchi = bandpass_filtering(30, bp, white_data, tevent)
+    out, x, white_data_bp_zoom, fit_function = bandpass_filtering(bp, 350, white_data, tevent)
     
     for param in out.params:
         
         # append fitted parameters to lists in result_dict
         result_dict[param].append(out.params[param].value)
+
+    result_dict['t0_err'].append(out.params['t0'].stderr)
     
-    result_dict['redchi'].append(redchi)
+    
+
+# Iterate upper bandpass limit
+#----------------------------------------------------------------
+
+# result_dict = {'bp': [], 'Mc':[], 't0':[], 't0_err':[], 'C':[], 'phi':[], 'redchi':[]}
+
+# for bp in np.linspace(100, 400, 20):
+    
+#     result_dict['bp'].append(bp)
+    
+#     out, x, white_data_bp_zoom, fit_function = bandpass_filtering(30, bp, white_data, tevent)
+    
+#     for param in out.params:
+        
+#         # append fitted parameters to lists in result_dict
+#         result_dict[param].append(out.params[param].value)
+    
+#     result_dict['t0_err'].append(out.params['t0'].stderr)
+    
 
 
-# Iterate lower bandpass limit
+# Plot (data - fit): lower bandpass
 #----------------------------------------------------------------
 
 # result_dict = {'bp': [], 'Mc':[], 't0':[], 'C':[], 'phi':[], 'redchi':[]}
 
-# for bp in np.linspace(10, 100, 45):
+# fig, axs = plt.subplots(nrows=2, ncols=1, sharex=True, sharey=True)
+
+# for i, bp in enumerate([30, 100]):
     
 #     result_dict['bp'].append(bp)
     
-#     out, redchi = bandpass_filtering(bp, 350, white_data, tevent)
+#     out, x, data, fit_function = bandpass_filtering(bp, 350, white_data, tevent)
     
 #     for param in out.params:
         
 #         # append fitted parameters to lists in result_dict
 #         result_dict[param].append(out.params[param].value)  
     
-#     result_dict['redchi'].append(redchi)
+#     # result_dict['redchi'].append(redchi)
+#     axs[i].plot(x, (data - fit_function))
+#     axs[i].set_title('Bandpass: {:.0f} - 350 $[Hz]$'.format(bp), fontsize=13)
+#     if i == 1:
+#         axs[i].set_xlabel('Time $[s]$', fontsize=12)
+#     axs[i].set_ylabel('Data - Fit $[-]$', fontsize=12)
+    
+    
+
+# Plot (data - fit): upper bandpass
+#----------------------------------------------------------------
+
+# result_dict = {'bp': [], 'Mc':[], 't0':[], 'C':[], 'phi':[], 'redchi':[]}
+
+# fig, axs = plt.subplots(nrows=2, ncols=1, sharex=True, sharey=True)
+
+# for i, bp in enumerate([200, 400]):
+    
+#     result_dict['bp'].append(bp)
+    
+#     out, x, data, fit_function = bandpass_filtering(30, bp, white_data, tevent)
+    
+#     for param in out.params:
         
+#         # append fitted parameters to lists in result_dict
+#         result_dict[param].append(out.params[param].value)  
+    
+#     # result_dict['redchi'].append(redchi)
+#     axs[i].plot(x, (data - fit_function))
+#     axs[i].set_title('Bandpass: 30 - {:.0f} $[Hz]$'.format(bp), fontsize=13)
+#     if i == 1:
+#         axs[i].set_xlabel('Time $[s]$', fontsize=12)
+#     axs[i].set_ylabel('Data - Fit $[-]$', fontsize=12)
+    
+
+
+# plt.savefig("data - fit UB comparison", dpi=300)  # Save the data - fit figures
 
 lower_bp = result_dict['bp']
-redchi = result_dict['redchi']
-Mc = result_dict['Mc']
+t0 = result_dict['t0']
+t0_err = result_dict['t0_err']
 
-plt.scatter(lower_bp, redchi, color='k')
+plt.figure()
+plt.rc('axes', axisbelow=True)  # grid lines behind data
+plt.gca().xaxis.grid(False)
+plt.scatter(lower_bp, t0, color='k')
+plt.errorbar(lower_bp, t0, yerr=t0_err, fmt='o', label='parameter uncert.', color='black')
 plt.xlabel('Lower bandpass filter limit (__ - 350) $[Hz]$')
-plt.ylabel('Reduced $\chi^2$')
-
-for i, bp in enumerate(lower_bp):
-    plt.text(bp, redchi[i], round(Mc[i],1), fontsize=8)
+plt.ylabel('$t_0$ fit parameter')
 
 plt.tight_layout()
-plt.savefig("Lower bandpass chisq sensitivity-2", dpi=300)
+
+plt.savefig("Lower bandpass t0 accuracy w error", dpi=300)
+# ax2 = fig.add_axes([.70, .15, .15, .075])
+
 plt.show()
-
-
 
 
 

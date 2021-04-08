@@ -163,7 +163,7 @@ fn = 'data/H-H1_GWOSC_4KHZ_R1-1126257415-4096.hdf5' # data file
 tevent = 1126259462.422 # Mon Sep 14 09:50:45 GMT 2015
 evtname = 'GW150914' # event name
 
-detector = 'L1' # detector: L1 or H1
+detector = 'H1' # detector: L1 or H1
 
 
 # Load LIGO data
@@ -183,44 +183,58 @@ asd = strain.asd(fftlength=8)
 white_data = strain.whiten()
 
 
+# Official LIGO bandpass/zoom for this data
+#----------------------------------------------------------------
+white_data_bp = white_data.bandpass(30, 350)
+    
+sample_times = white_data_bp.times.value
+sample_data = white_data_bp.value
+indxt = np.where((sample_times >= (tevent-0.17)) & (sample_times < (tevent+0.13)))
+x = sample_times[indxt]
+x = x-x[0]
+
+pulse_ind = np.where((sample_times >= (tevent-0.001)) & (sample_times < (tevent+0.001)))
+pulse_time = np.average(sample_times[pulse_ind] - sample_times[indxt][0])
+
+
 
 # Iterate lower bandpass limit
 #----------------------------------------------------------------
 
-result_dict = {'bp': [], 'Mc':[], 't0':[], 't0_err':[], 'C':[], 'phi':[], 'redchi':[]}
+result_dict_lo = {'bp': [], 'Mc':[], 't0':[], 't0_err':[], 'C':[], 'phi':[], 'redchi':[]}
 
-for bp in np.linspace(10,70,20):
+for bp in np.linspace(10,100,20):
     
-    result_dict['bp'].append(bp)
+    result_dict_lo['bp'].append(bp)
     
-    out, x, white_data_bp_zoom, fit_function = bandpass_filtering(bp, 350, white_data, tevent)
+    out, x_lo, white_data_bp_zoom, fit_function = bandpass_filtering(bp, 350, white_data, tevent)
     
     for param in out.params:
         
         # append fitted parameters to lists in result_dict
-        result_dict[param].append(out.params[param].value)
+        result_dict_lo[param].append(out.params[param].value)
 
-    result_dict['t0_err'].append(out.params['t0'].stderr)
+    result_dict_lo['t0_err'].append(out.params['t0'].stderr)
     
     
 
 # Iterate upper bandpass limit
 #----------------------------------------------------------------
 
-# result_dict = {'bp': [], 'Mc':[], 't0':[], 't0_err':[], 'C':[], 'phi':[], 'redchi':[]}
+# result_dict_hi = {'bp': [], 'Mc':[], 't0':[], 't0_err':[], 'C':[], 'phi':[], 'redchi':[]}
 
 # for bp in np.linspace(100, 400, 20):
     
-#     result_dict['bp'].append(bp)
+#     result_dict_hi['bp'].append(bp)
     
-#     out, x, white_data_bp_zoom, fit_function = bandpass_filtering(30, bp, white_data, tevent)
+#     out, x_hi, white_data_bp_zoom, fit_function = bandpass_filtering(30, bp, white_data, tevent)
     
 #     for param in out.params:
         
 #         # append fitted parameters to lists in result_dict
-#         result_dict[param].append(out.params[param].value)
+#         result_dict_hi[param].append(out.params[param].value)
     
-#     result_dict['t0_err'].append(out.params['t0'].stderr)
+#     result_dict_hi['t0_err'].append(out.params['t0'].stderr)
     
 
 
@@ -280,21 +294,36 @@ for bp in np.linspace(10,70,20):
 
 # plt.savefig("data - fit UB comparison", dpi=300)  # Save the data - fit figures
 
-lower_bp = result_dict['bp']
-t0 = result_dict['t0']
-t0_err = result_dict['t0_err']
+lower_bp = result_dict_lo['bp']
+t0_lo = result_dict_lo['t0']
+t0_err_lo = result_dict_lo['t0_err']
+
+# upper_bp = result_dict_hi['bp']
+# t0_hi = result_dict_hi['t0']
+# t0_err_hi = result_dict_hi['t0_err']
+
+
+# fig, ax = plt.subplots(3, 1, 
+#                        gridspec_kw={
+#                            'height_ratios':[.5, 1, 1]})
 
 plt.figure()
 plt.rc('axes', axisbelow=True)  # grid lines behind data
 plt.gca().xaxis.grid(False)
-plt.scatter(lower_bp, t0, color='k')
-plt.errorbar(lower_bp, t0, yerr=t0_err, fmt='o', label='parameter uncert.', color='black')
+
+
+# ref_fit = bandpass_filtering(30, 350, white_data, tevent)
+# ax[0].plot(white_data_bp_zoom, )
+# ax[1].scatter(lower_bp, t0_lo, color='k')
+plt.errorbar(lower_bp, t0_lo, yerr=t0_err_lo, fmt='o', label='$t_0$ parameter $\pm \sigma$', color='black')
+plt.plot(lower_bp, pulse_time * np.ones(len(lower_bp)), color='red', label='GPS event time')
 plt.xlabel('Lower bandpass filter limit (__ - 350) $[Hz]$')
 plt.ylabel('$t_0$ fit parameter')
+plt.legend()
 
 plt.tight_layout()
 
-plt.savefig("Lower bandpass t0 accuracy w error", dpi=300)
+plt.savefig("Lower bandpass t0 accuracy - wide range w error", dpi=300)
 # ax2 = fig.add_axes([.70, .15, .15, .075])
 
 plt.show()

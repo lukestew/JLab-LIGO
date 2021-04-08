@@ -105,8 +105,9 @@ def osc_dif(params, x, data, eps):
 
 # Set parameters
 # ------------------------------------------------
-fn = 'data/H-H1_GWOSC_4KHZ_R1-1126257415-4096.hdf5' # data file
-tevent = 1126259462.422 # Mon Sep 14 09:50:45 GMT 2015
+fn = 'data/GW151012/H-H1_GWOSC_4KHZ_R1-1128676853-4096.hdf5' # data file
+treport = 1128678900.4
+tevent = 1128678900.42 # Mon Sep 14 09:50:45 GMT 2015
 evtname = 'GW150914' # event name
 
 detector = 'L1' # detector: L1 or H1
@@ -137,8 +138,8 @@ white_data = strain.whiten()
 
 # Bandpass filtering
 #----------------------------------------------------------------
-bandpass_low = 100
-bandpass_high = 350
+bandpass_low = 30
+bandpass_high = 400
 
 white_data_bp = white_data.bandpass(bandpass_low, bandpass_high)
 
@@ -149,7 +150,26 @@ white_data_bp = white_data.bandpass(bandpass_low, bandpass_high)
 # plt.figure()
 # white_data_bp.plot()
 # plt.ylabel('strain zoomed (whitened + band-pass)')
-# plt.xlim(tevent-.17, tevent+.13)
+# plt.xlim(tevent-1, tevent+1)
+
+# white_data_bp.plot()
+
+
+#----------------------------------------------------------------
+# q-transform
+#----------------------------------------------------------------
+
+dt = 1  #-- Set width of q-transform plot, in seconds
+hq = white_data_bp.q_transform(outseg=(tevent-dt, tevent+dt))
+
+plt.clf()
+fig = hq.plot()
+ax = fig.gca()
+fig.colorbar(label="Normalised energy")
+ax.grid(False)
+plt.xlim(tevent-0.5, tevent+0.4)
+plt.yscale('log')
+plt.ylabel('Frequency (Hz)')
 
 
 
@@ -177,6 +197,13 @@ x = sample_times[indxt]
 x = x-x[0]
 white_data_bp_zoom = sample_data[indxt]
 
+pulse_ind = np.where((sample_times >= (tevent-0.001)) & (sample_times < (tevent+0.001)))
+pulse_time = np.average(sample_times[pulse_ind] - sample_times[indxt][0])
+
+report_time_ind = np.where((sample_times >= (treport-0.001)) & (sample_times < (treport+0.001)))
+report_time = np.average(sample_times[report_time_ind] - sample_times[indxt][0])
+
+
 plt.figure(figsize=(12, 4))
 plt.subplots_adjust(left=0.1, right=0.9, top=0.85, bottom=0.2)
 plt.plot(x, white_data_bp_zoom)
@@ -190,8 +217,12 @@ p['t0'].set(0.18)  # By construction we put the merger in the center
 p['C'].set(1e-12)      # normalization guess
 p['phi'].set(0)    # Phase guess
 unc = np.full(len(white_data_bp_zoom),20)
-print(unc)
 out = minimize(osc_dif, params=p, args=(x, white_data_bp_zoom, unc))
+print("----------------------------------")
+print("tevent:", tevent)
+print('LIGO reported time:', report_time)
+print('t0: {:f}'.format(out.params['t0'].value))
+print('t0 sigma: {:f}'.format(out.params['t0'].stderr))
 print(fit_report(out))
 Mc = out.params['Mc']
 t0 = out.params['t0']
@@ -201,25 +232,15 @@ phi = out.params['phi']
 plt.plot(x, osc(x, Mc, t0, C, phi))
 
 plt.plot(x, model.eval(params=out.params,t=x),'r',label='best fit')
+plt.plot(pulse_time * np.ones(100), np.linspace(-4,4,100), color='black')
 
-
-# print(out.chisqr)
-# print(max(model.eval(params=out.params,t=x)))
-# diff = abs(np.array(white_data_bp_zoom) - np.array(model.eval(params=out.params,t=x)))
 
 fit_function = np.array(model.eval(params=out.params,t=x))
 
-chi_square = 0
-residual = 0
 
-for i in range(len(white_data_bp_zoom)):
-    chi_square += (white_data_bp_zoom[i] - fit_function[i])**2 / (.10 * white_data_bp_zoom[i])**2
-    residual += (white_data_bp_zoom[i] - fit_function[i])**2
+# plt.figure()
+# plt.plot(x, (white_data_bp_zoom - fit_function))
 
-print('chisq:', chi_square / (len(white_data_bp_zoom) - 4))
-
-plt.figure()
-plt.plot(x, (white_data_bp_zoom - fit_function) / (.3))
 
 remaining_signal = (white_data_bp_zoom - fit_function) / (.3)
 print('remaining = ', np.std(remaining_signal))
@@ -228,8 +249,8 @@ print(remaining_signal[223])
 print(white_data_bp_zoom[223])
 print(fit_function[223])
 
-plt.savefig("good strain fit", dpi=300)
-plt.show()
+# plt.savefig("good strain fit", dpi=300)
+# plt.show()
 
 
 

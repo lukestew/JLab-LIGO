@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+Created on Thu Apr  8 12:30:53 2021
+
+@author: lukestew
+"""
+# !/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
 Created on Fri Mar 26 12:44:28 2021
 
 @author: lukestew
@@ -17,10 +24,9 @@ import lmfit
 from lmfit import Model, minimize, fit_report, Parameters
 
 
-
-def gwfreq(iM,iT,iT0):
+def gwfreq(iM, iT, iT0):
     """
-    
+
     Parameters
     ----------
     iM : float
@@ -33,11 +39,11 @@ def gwfreq(iM,iT,iT0):
     Returns
     -------
     w(t): angular velocity function as binary merger occurs
-        
+
     """
-    
-    const = (948.5)*np.power((1./iM),5./8.)
-    output = const*np.power(np.maximum((iT0-iT),3e-2),-3./8.) # we can max it out above 500 Hz-ish
+
+    const = (948.5) * np.power((1. / iM), 5. / 8.)
+    output = const * np.power(np.maximum((iT0 - iT), 3e-2), -3. / 8.)  # we can max it out above 500 Hz-ish
     return output
 
 
@@ -61,22 +67,24 @@ def osc(t, Mc, t0, C, phi):
     -------
     array : rudimentary fit ansatz with inspiral, collision,
             decaying exponential ringdown
-        
+
     """
-    
+
     vals = []
     for time in t:
         if time <= t0:
-            vals.append(C*1e-12 * (Mc * gwfreq(Mc, time, t0))**(10/3) * np.cos(gwfreq(Mc, time, t0) * (time-t0) + phi))
+            vals.append(
+                C * 1e-12 * (Mc * gwfreq(Mc, time, t0)) ** (10 / 3) * np.cos(gwfreq(Mc, time, t0) * (time - t0) + phi))
         else:
-            vals.append(np.exp(-100*(time-t0)) * C*1e-12 * (Mc * gwfreq(Mc, time, t0))**(10/3) * np.cos(gwfreq(Mc, time, t0) * (time-t0) + phi))
+            vals.append(np.exp(-100 * (time - t0)) * C * 1e-12 * (Mc * gwfreq(Mc, time, t0)) ** (10 / 3) * np.cos(
+                gwfreq(Mc, time, t0) * (time - t0) + phi))
 
     return np.asarray(vals)
 
 
 def osc_dif(params, x, data, eps):
     """
-    
+
     Parameters
     ----------
     params : lmfit.parameter class instance
@@ -92,19 +100,19 @@ def osc_dif(params, x, data, eps):
     array : Residual of fit - data given input fit parameters
 
     """
-    
-    iM=params["Mc"]
-    iT0=params["t0"]
-    norm=params["C"]
-    phi=params["phi"]
-    val=osc(x, iM, iT0, norm, phi)
-    
-    return (val-data)/eps
+
+    iM = params["Mc"]
+    iT0 = params["t0"]
+    norm = params["C"]
+    phi = params["phi"]
+    val = osc(x, iM, iT0, norm, phi)
+
+    return (val - data) / eps
 
 
 def bandpass_filtering(bp_lo, bp_hi, white_data, tevent):
     """
-    
+
     Parameters
     ----------
     bp_lo : float
@@ -115,181 +123,168 @@ def bandpass_filtering(bp_lo, bp_hi, white_data, tevent):
         Whitened data
     t_event : float
         Merger time
-    
+
     Returns
     -------
-    MinimizerResult : 
+    MinimizerResult :
         Values of fitted parameters
-    
+
     """
 
     white_data_bp = white_data.bandpass(bp_lo, bp_hi)
-    
+
     sample_times = white_data_bp.times.value
     sample_data = white_data_bp.value
-    indxt = np.where((sample_times >= (tevent-0.17)) & (sample_times < (tevent+0.13)))
+    indxt = np.where((sample_times >= (tevent - 0.17)) & (sample_times < (tevent + 0.13)))
     x = sample_times[indxt]
-    x = x-x[0]
-    
+    x = x - x[0]
+
     white_data_bp_zoom = sample_data[indxt]
-    
+
     model = lmfit.Model(osc)
     p = model.make_params()
-    p['Mc'].set(20)     # Mass guess
+    p['Mc'].set(20)  # Mass guess
     p['t0'].set(0.18)  # By construction we put the merger in the center
-    p['C'].set(1)      # normalization guess
-    p['phi'].set(0)    # Phase guess
-    unc = np.full(len(white_data_bp_zoom),20)
-    
+    p['C'].set(1)  # normalization guess
+    p['phi'].set(0)  # Phase guess
+    unc = np.full(len(white_data_bp_zoom), 20)
+
     out = minimize(osc_dif, params=p, args=(x, white_data_bp_zoom, unc))
-    
-    fit_function = np.array(model.eval(params=out.params,t=x))
+
+    fit_function = np.array(model.eval(params=out.params, t=x))
     # chi_square = 0
 
     # for i in range(len(white_data_bp_zoom)):
     #     chi_square += (white_data_bp_zoom[i] - fit_function[i])**2 / (.10 * white_data_bp_zoom[i])**2
-    
+
     print('bandpass: {:.0f} - {:.0f}'.format(bp_lo, bp_hi))
-    
-    fit_function = np.array(model.eval(params=out.params,t=x))
-    
+
+    fit_function = np.array(model.eval(params=out.params, t=x))
+
     return out, x, white_data_bp_zoom, fit_function
 
 
-
 # Set parameters
-#----------------------------------------------------------------
-fn = 'data/H-H1_GWOSC_4KHZ_R1-1126257415-4096.hdf5' # data file
-tevent = 1126259462.422 # Mon Sep 14 09:50:45 GMT 2015
-evtname = 'GW150914' # event name
+# ----------------------------------------------------------------
+fn = 'data/H-H1_GWOSC_4KHZ_R1-1126257415-4096.hdf5'  # data file
+tevent = 1126259462.422  # Mon Sep 14 09:50:45 GMT 2015
+evtname = 'GW150914'  # event name
 
-detector = 'H1' # detector: L1 or H1
-
+detector = 'H1'  # detector: L1 or H1
 
 # Load LIGO data
-#----------------------------------------------------------------
+# ----------------------------------------------------------------
 strain = TimeSeries.read(fn, format='hdf5.losc')
 center = int(tevent)
-strain = strain.crop(center-16, center+16)
-
+strain = strain.crop(center - 16, center + 16)
 
 # Obtain the power spectrum density PSD / ASD
-#----------------------------------------------------------------
+# ----------------------------------------------------------------
 asd = strain.asd(fftlength=8)
 
-
 # Whitening data
-#----------------------------------------------------------------
+# ----------------------------------------------------------------
 white_data = strain.whiten()
 
-
 # Official LIGO bandpass/zoom for this data
-#----------------------------------------------------------------
+# ----------------------------------------------------------------
 white_data_bp = white_data.bandpass(30, 350)
-    
+
 sample_times = white_data_bp.times.value
 sample_data = white_data_bp.value
-indxt = np.where((sample_times >= (tevent-0.17)) & (sample_times < (tevent+0.13)))
+indxt = np.where((sample_times >= (tevent - 0.17)) & (sample_times < (tevent + 0.13)))
 x = sample_times[indxt]
-x = x-x[0]
+x = x - x[0]
 
-pulse_ind = np.where((sample_times >= (tevent-0.001)) & (sample_times < (tevent+0.001)))
+pulse_ind = np.where((sample_times >= (tevent - 0.001)) & (sample_times < (tevent + 0.001)))
 pulse_time = np.average(sample_times[pulse_ind] - sample_times[indxt][0])
 
-
-
 # Iterate lower bandpass limit
-#----------------------------------------------------------------
+# ----------------------------------------------------------------
 
-result_dict_lo = {'bp': [], 'Mc':[], 't0':[], 't0_err':[], 'C':[], 'phi':[], 'redchi':[]}
+result_dict_lo = {'bp': [], 'Mc': [], 't0': [], 't0_err': [], 'C': [], 'phi': [], 'redchi': []}
 
-for bp in np.linspace(10,100,20):
-    
+for bp in np.linspace(10, 100, 20):
+
     result_dict_lo['bp'].append(bp)
-    
+
     out, x_lo, white_data_bp_zoom, fit_function = bandpass_filtering(bp, 350, white_data, tevent)
-    
+
     for param in out.params:
-        
         # append fitted parameters to lists in result_dict
         result_dict_lo[param].append(out.params[param].value)
 
     result_dict_lo['t0_err'].append(out.params['t0'].stderr)
-    
-    
 
 # Iterate upper bandpass limit
-#----------------------------------------------------------------
+# ----------------------------------------------------------------
 
 # result_dict_hi = {'bp': [], 'Mc':[], 't0':[], 't0_err':[], 'C':[], 'phi':[], 'redchi':[]}
 
 # for bp in np.linspace(100, 400, 20):
-    
+
 #     result_dict_hi['bp'].append(bp)
-    
+
 #     out, x_hi, white_data_bp_zoom, fit_function = bandpass_filtering(30, bp, white_data, tevent)
-    
+
 #     for param in out.params:
-        
+
 #         # append fitted parameters to lists in result_dict
 #         result_dict_hi[param].append(out.params[param].value)
-    
+
 #     result_dict_hi['t0_err'].append(out.params['t0'].stderr)
-    
 
 
 # Plot (data - fit): lower bandpass
-#----------------------------------------------------------------
+# ----------------------------------------------------------------
 
 # result_dict = {'bp': [], 'Mc':[], 't0':[], 'C':[], 'phi':[], 'redchi':[]}
 
 # fig, axs = plt.subplots(nrows=2, ncols=1, sharex=True, sharey=True)
 
 # for i, bp in enumerate([30, 100]):
-    
+
 #     result_dict['bp'].append(bp)
-    
+
 #     out, x, data, fit_function = bandpass_filtering(bp, 350, white_data, tevent)
-    
+
 #     for param in out.params:
-        
+
 #         # append fitted parameters to lists in result_dict
-#         result_dict[param].append(out.params[param].value)  
-    
+#         result_dict[param].append(out.params[param].value)
+
 #     # result_dict['redchi'].append(redchi)
 #     axs[i].plot(x, (data - fit_function))
 #     axs[i].set_title('Bandpass: {:.0f} - 350 $[Hz]$'.format(bp), fontsize=13)
 #     if i == 1:
 #         axs[i].set_xlabel('Time $[s]$', fontsize=12)
 #     axs[i].set_ylabel('Data - Fit $[-]$', fontsize=12)
-    
-    
+
 
 # Plot (data - fit): upper bandpass
-#----------------------------------------------------------------
+# ----------------------------------------------------------------
 
 # result_dict = {'bp': [], 'Mc':[], 't0':[], 'C':[], 'phi':[], 'redchi':[]}
 
 # fig, axs = plt.subplots(nrows=2, ncols=1, sharex=True, sharey=True)
 
 # for i, bp in enumerate([200, 400]):
-    
+
 #     result_dict['bp'].append(bp)
-    
+
 #     out, x, data, fit_function = bandpass_filtering(30, bp, white_data, tevent)
-    
+
 #     for param in out.params:
-        
+
 #         # append fitted parameters to lists in result_dict
-#         result_dict[param].append(out.params[param].value)  
-    
+#         result_dict[param].append(out.params[param].value)
+
 #     # result_dict['redchi'].append(redchi)
 #     axs[i].plot(x, (data - fit_function))
 #     axs[i].set_title('Bandpass: 30 - {:.0f} $[Hz]$'.format(bp), fontsize=13)
 #     if i == 1:
 #         axs[i].set_xlabel('Time $[s]$', fontsize=12)
 #     axs[i].set_ylabel('Data - Fit $[-]$', fontsize=12)
-    
 
 
 # plt.savefig("data - fit UB comparison", dpi=300)  # Save the data - fit figures
@@ -303,14 +298,13 @@ t0_err_lo = result_dict_lo['t0_err']
 # t0_err_hi = result_dict_hi['t0_err']
 
 
-# fig, ax = plt.subplots(3, 1, 
+# fig, ax = plt.subplots(3, 1,
 #                        gridspec_kw={
 #                            'height_ratios':[.5, 1, 1]})
 
 plt.figure()
 plt.rc('axes', axisbelow=True)  # grid lines behind data
 plt.gca().xaxis.grid(False)
-
 
 # ref_fit = bandpass_filtering(30, 350, white_data, tevent)
 # ax[0].plot(white_data_bp_zoom, )
